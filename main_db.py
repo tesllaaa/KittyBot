@@ -1,8 +1,11 @@
 import os
 from dotenv import load_dotenv
 import telebot
+from telebot import types
 import time
-from db import init_db, add_note, list_notes, update_note, delete_note, find_notes, list_all_notes, get_weekly_stats
+from db import init_db, add_note, list_notes, update_note, delete_note, find_notes, list_all_notes, get_weekly_stats, \
+    get_active_model, set_active_model, list_models
+from openrouter_client import OpenRouterError, chat_once
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -14,6 +17,18 @@ bot = telebot.TeleBot(TOKEN)
 
 # Инициализация базы данных при запуске
 init_db()
+
+
+def _build_messages(user_id: int, user_text: str) -> list[dict]:
+    system = (
+        f"Ты отвечаешь кратко и по-существу. \n"
+        "Правила: \n"
+        "1) Технические ответы давай корректно и по пунктам.\n"
+    )
+    return [
+    {"role": "system", "content": system},
+    {"role": "user", "content": user_text},
+    ]
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -30,6 +45,7 @@ def help_cmd(message):
 /note_del <id> - Удалить заметку
 /note_export - Экспортировать заметки
 /stats - Еженедельная статистика
+/ask - Вопрос
 """
     bot.reply_to(message, help_text)
 
@@ -64,6 +80,57 @@ def note_list(message):
 
     response = "Ваши заметки:\n" + "\n".join([f"{note['id']}: {note['text']}" for note in user_notes])
     bot.reply_to(message, response)
+
+@bot.message_handler(commands=["models"])
+def cmd_models(message: types.Message) -> None:
+    items = list_models()
+    if not items:
+        bot.reply_to(message, "Список моделей пуст.")
+        return
+    lines = ["Доступные модели:"]
+    for m in items:
+        star = "★" if m["active"] else " "
+        lines.append(f"{star} {m['id']}. {m['label']}  [{m['key']}]")
+    lines.append("\nАктивировать: /model <ID>")
+    bot.reply_to(message, "\n".join(lines))
+
+
+@bot.message_handler(commands=["model"])
+def cmd_model(message: types.Message) -> None:
+    arg = message.text.replace("/model", "", 1).strip()
+    if not arg:
+        active = get_active_model()
+        bot.reply_to(message, text=f"Текущая активная модель: {active['label']} [{active['key']}]\n(сменить: /model <ID> или /models)")
+        return
+    if not arg.isdigit():
+        bot.reply_to(message, text="Использование: /model <ID из /models>")
+        return
+    try:
+        active = set_active_model(int(arg))
+        bot.reply_to(message, text=f"Активная модель переключена: {active['label']} [{active['key']}]")
+    except ValueError:
+        bot.reply_to(message, text="Неизвестный ID модели. Сначала /models.")
+
+
+@bot.message_handler(commands=["ask"])
+def cmd_ask(message: types.Message) -> None:
+    q = message. text.replace ("/ask", "", 1) .strip()
+    if not q:
+        bot.reply_to(message, "Использование: /ask <вопрос>")
+        return
+
+    msgs = _build_messages(message.from_user.id, q[:600])
+    model_key = get_active_model() ["key"]
+
+    try:
+        text, ms = chat_once(msgs, model=model_key, temperature=0.2, max_tokens=400)
+        out = (text or "") .strip()[: 4000]
+        bot.reply_to(message, f"{out}\n\n({ms} мc; модель: {model_key})")
+    except OpenRouterError as e:
+        bot.reply_to(message, f"Ошибка: {e}")
+    except Exception:
+        bot.reply_to(message, "Непредвиденная ошибка. ")
+
 
 @bot.message_handler(commands=['note_find'])
 def note_find(message):
