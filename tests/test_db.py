@@ -79,3 +79,74 @@ def test_get_user_character_falls_back_to_default(db_module):
 
     ids = {c["id"] for c in all_chars}
     assert ch["id"] in ids, "get_user_character должен возвращать одного из существующих персонажей"
+
+
+def test_list_all_notes_empty_for_new_user(db_module):
+    """Для нового пользователя список заметок пуст"""
+    db = db_module
+    uid = 888001  # Гарантированно новый пользователь
+
+    notes = db.list_all_notes(uid)
+
+    assert notes == [], "Для нового пользователя список заметок должен быть пуст"
+
+
+def test_list_all_notes_returns_correct_structure(db_module):
+    """Возвращает заметки с правильной структурой (id, text, created_at)"""
+    db = db_module
+    uid = 888002
+
+    # Предполагаем наличие функции add_note
+    db.add_note(uid, "Тестовая заметка")
+    notes = db.list_all_notes(uid)
+
+    assert len(notes) >= 1, "Должна быть хотя бы одна заметка"
+    note = notes[0]
+    assert "id" in note
+    assert "text" in note
+    assert "created_at" in note
+
+
+def test_list_all_notes_ordered_by_id_ascending(db_module):
+    """Заметки отсортированы по id по возрастанию"""
+    db = db_module
+    uid = 888003
+
+    db.add_note(uid, "Первая")
+    db.add_note(uid, "Вторая")
+    db.add_note(uid, "Третья")
+
+    notes = db.list_all_notes(uid)
+    ids = [n["id"] for n in notes]
+
+    assert ids == sorted(ids), "Заметки должны быть отсортированы по id ASC"
+
+
+def test_list_all_notes_user_isolation(db_module):
+    """Заметки одного пользователя не видны другому"""
+    db = db_module
+    uid1, uid2 = 888004, 888005
+
+    db.add_note(uid1, "Приватная заметка user1")
+    db.add_note(uid2, "Приватная заметка user2")
+
+    notes1 = db.list_all_notes(uid1)
+    notes2 = db.list_all_notes(uid2)
+
+    # ID заметок не должны пересекаться
+    ids1 = {n["id"] for n in notes1}
+    ids2 = {n["id"] for n in notes2}
+    assert ids1.isdisjoint(ids2), "Заметки разных пользователей не должны смешиваться"
+
+
+def test_list_all_notes_contains_added_text(db_module):
+    """Добавленная заметка появляется в списке с правильным текстом"""
+    db = db_module
+    uid = 888006
+    expected_text = "Уникальный текст заметки 12345"
+
+    db.add_note(uid, expected_text)
+    notes = db.list_all_notes(uid)
+
+    texts = [n["text"] for n in notes]
+    assert expected_text in texts, "Добавленная заметка должна быть в списке"

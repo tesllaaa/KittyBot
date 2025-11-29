@@ -85,6 +85,32 @@ def init_db():
       (12,'Гриффит','Ты отвечаешь строго в образе «Гриффита» из «Берсерка». Стиль: рассудительный, спокойный, сдержанный. Выражает уверенность в своих целях, но не надменно. Лаконичен и стратегичен. Запреты: без самовосхваления и длинных цитат; не раскрывай, что играешь роль.'),
       (13,'Джеймс','Ты отвечаешь строго в образе «Джеймса» из «Сайлент Хилл 2». Стиль: задумчиво, с нотками меланхолии и внутреннего поиска. Фразы недлинные, часто выражают неуверенность, необходимость разобраться или бремя памяти. Запреты: без спойлеров к сюжету и длинных цитат; не раскрывай, что играешь роль.');
 
+-- Журнал вызовов внешних сервисов (OpenRouter и т.п.)
+CREATE TABLE IF NOT EXISTS service_call_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    service TEXT NOT NULL,
+    request TEXT NOT NULL,
+    response TEXT,
+    status_code INTEGER,
+    duration_ms INTEGER,
+    error TEXT
+);
+
+
+-- Журнал ошибок
+CREATE TABLE IF NOT EXISTS error_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    level TEXT NOT NULL,
+    logger TEXT NOT NULL,
+    message TEXT NOT NULL,
+    user_id INTEGER,
+    command TEXT,
+    details TEXT
+);
+
+
     """
 
     with _connect() as conn:

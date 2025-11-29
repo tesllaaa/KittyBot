@@ -72,10 +72,18 @@ def start_help(m: types.Message) -> None:
         reply_markup=make_main_Kb()
     )
 
+# Настраиваем логирование до того, как делаем что-либо еще
+setup_logging()
+log = logging.getLogger(__name__)
+
+log.info("Старт приложения (инициализация бота)")
+
 @bot.message_handler(commands=['start'])
 def start(message):
-    logger.info(f"Команда start от пользователя {message.from_user.id}")
-    bot.reply_to(message, "Привет! Я твой первый бот! напиши /help")
+    log.debug("Запущена команда /start")
+    text = "Привет! Я бот для заметок. Используй /help для списка команд."
+    log.debug(f"Команда start вернула текст:\n{text}")
+    bot.reply_to(message, text, reply_markup=create_main_keyboard())
 
 @bot.message_handler(commands=['help'])
 def help_cmd(message):
